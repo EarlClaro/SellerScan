@@ -1,10 +1,12 @@
 from pymongo import MongoClient
-import os
 from dotenv import load_dotenv
+import os
 
 load_dotenv()
-client = MongoClient(os.getenv("MONGO_URI"))
-db = client["sellerscan_db"]
+MONGO_URI = os.getenv("MONGODB_URI")
+
+client = MongoClient(MONGO_URI)
+db = client["sellerscan"]
 
 users_col = db["users"]
 sellers_col = db["sellers"]
