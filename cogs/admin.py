@@ -29,7 +29,7 @@ class AdminCommands(commands.Cog):
             await ctx.send(f"⚠️ Failed to fetch listings for seller `{seller_id}` right now.")
             return
 
-        asins = seller_data["asinList"][:5]
+        asins = seller_data["asinList"][:3]
         for asin in asins:
             asin_data = await fetch_asin_details(asin)
             if asin_data:
