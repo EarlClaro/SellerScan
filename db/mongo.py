@@ -2,19 +2,20 @@ from pymongo import MongoClient
 from dotenv import load_dotenv
 import os
 
-load_dotenv()  # Load environment variables from the .env file
-MONGO_URI = os.getenv("MONGODB_URI")
+load_dotenv()
 
-# Connect to MongoDB
-client = MongoClient(MONGO_URI)
-
-# Access the database
+client = MongoClient(os.getenv("MONGODB_URI"))
 db = client["sellerscan"]
-
-# Access collections (you can add more collections as needed)
 users_col = db["users"]
 sellers_col = db["sellers"]
 asins_col = db["asins"]
+
+def get_tracked_asins(seller_id):
+    return set(doc["asin"] for doc in asins_col.find({"seller_id": seller_id}))
+
+def add_new_asin(asin, seller_id):
+    asins_col.insert_one({"asin": asin, "seller_id": seller_id})
+
 
 print(users_col.find_one())
 print("Connected to MongoDB:", db)

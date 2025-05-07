@@ -2,26 +2,36 @@ import discord
 from discord.ext import commands
 from dotenv import load_dotenv
 import os
+import asyncio
+from tasks.refresher import check_new_listings
 
 load_dotenv()
-
 TOKEN = os.getenv("DISCORD_TOKEN")
 
 intents = discord.Intents.default()
-intents.message_content = True
-intents.guilds = True
-intents.members = True
+intents.message_content = True  # Make sure this is enabled
+intents.dm_messages = True
+bot = commands.Bot(command_prefix="!", intents=intents)
 
-bot = commands.Bot(command_prefix="/", intents=intents)
-
-# Load command groups
-initial_extensions = ["cogs.admin", "cogs.user"]
-
-for ext in initial_extensions:
-    bot.load_extension(ext)
 
 @bot.event
 async def on_ready():
-    print(f"✅ Bot is online as {bot.user}")
+    print(f"Logged in as {bot.user}")
+    for cog in bot.cogs:
+        print(f"Loaded cog: {cog}")
 
-bot.run(TOKEN)
+async def load_extensions():
+    # Correctly await the loading of the cogs
+    await bot.load_extension("cogs.admin")
+    await bot.load_extension("cogs.user")
+
+
+async def main():
+    async with bot:
+        await load_extensions()  # Ensure this is awaited
+        bot.loop.create_task(check_new_listings(bot, interval=1800))  # 30 min
+        await bot.start(TOKEN)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

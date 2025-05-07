@@ -6,7 +6,8 @@ class UserCommands(commands.Cog):
 
     @commands.command(name="helpme")
     async def help_command(self, ctx):
+        print("Help command triggered!")
         await ctx.send("👋 This bot helps you track new listings from Amazon sellers. Contact an admin to subscribe.")
 
-def setup(bot):
-    bot.add_cog(UserCommands(bot))
+async def setup(bot):
+    await bot.add_cog(UserCommands(bot))
