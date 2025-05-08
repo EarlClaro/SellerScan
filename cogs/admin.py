@@ -1,7 +1,8 @@
 from discord.ext import commands
-from db.mongo import sellers_col, get_tracked_asins, add_new_asin
-from keepa.fetcher import fetch_seller_data, fetch_asin_details
-from utils.embeds import build_listing_embed
+from datetime import datetime
+from db.mongo import sellers_col, add_new_asin
+from keepa.fetcher import fetch_seller_data
+from utils.time import keepa_minutes_to_utc
 
 class AdminCommands(commands.Cog):
     def __init__(self, bot):
@@ -10,7 +11,8 @@ class AdminCommands(commands.Cog):
     @commands.command(name="addseller")
     @commands.has_permissions(administrator=True)
     async def addseller(self, ctx, seller_id: str):
-        channel_id = ctx.channel.id
+        channel = ctx.channel
+        channel_id = channel.id
 
         if sellers_col.find_one({"seller_id": seller_id}):
             await ctx.send(f"❌ Seller ID `{seller_id}` is already being tracked.")
@@ -23,19 +25,28 @@ class AdminCommands(commands.Cog):
 
         await ctx.send(f"✅ Seller ID `{seller_id}` has been added and will be tracked every 30 minutes.")
 
-        # Get ASIN list from Keepa
+        # Get seller data from Keepa
         seller_data = await fetch_seller_data(seller_id)
-        if not seller_data or "asinList" not in seller_data:
-            await ctx.send(f"⚠️ Failed to fetch listings for seller `{seller_id}` right now.")
+
+        if not seller_data or not seller_data.get("asinList"):
+            await ctx.send(f"⚠️ Seller `{seller_id}` has no current ASIN listings or data is unavailable.")
             return
 
-        asins = seller_data["asinList"][:3]
+        # Send and store the 2 most recent ASINs
+        asins = seller_data["asinList"][:2]
         for asin in asins:
-            asin_data = await fetch_asin_details(asin)
-            if asin_data:
-                embed = build_listing_embed(asin_data)
-                await ctx.send(embed=embed)
-                add_new_asin(asin, seller_id)
+            add_new_asin(asin, seller_id)
+            amazon_url = f"https://www.amazon.com/dp/{asin}"
+            index = seller_data["asinList"].index(asin)
+            keepa_time = seller_data["asinListLastSeen"][index]
+            timestamp = keepa_minutes_to_utc(keepa_time).strftime("%Y-%m-%d %H:%M:%S UTC")
+            await channel.send(
+                f"🆕 **New ASIN Detected!**\n"
+                f"**ASIN:** `{asin}`\n"
+                f"🔗 {amazon_url}\n"
+                f"🕒 Listed on: `{timestamp}`"
+            )
+
 
     @addseller.error
     async def addseller_error(self, ctx, error):

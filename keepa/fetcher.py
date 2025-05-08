@@ -3,15 +3,15 @@ import os
 from dotenv import load_dotenv
 
 load_dotenv()
-
 KEEPA_API_KEY = os.getenv("KEEPA_API_KEY")
-DOMAIN_ID = 1  # 1 = Amazon.com
+DOMAIN_ID = 1
 
 async def fetch_seller_data(seller_id):
     url = f"https://api.keepa.com/seller?key={KEEPA_API_KEY}&domain={DOMAIN_ID}&seller={seller_id}&storefront=1"
     async with aiohttp.ClientSession() as session:
         async with session.get(url) as resp:
             data = await resp.json()
+            print("Keepa API response:", data)
             if "sellers" not in data:
                 return None
             return data["sellers"].get(seller_id)
