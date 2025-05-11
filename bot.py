@@ -23,13 +23,12 @@ async def on_ready():
 async def load_extensions():
     # Correctly await the loading of the cogs
     await bot.load_extension("cogs.admin")
-    await bot.load_extension("cogs.user")
-
+    await bot.load_extension("cogs.user")  # Add the user cog
 
 async def main():
     async with bot:
         await load_extensions()  # Ensure this is awaited
-        bot.loop.create_task(check_new_listings(bot, interval=1800))  # 30 min
+        bot.loop.create_task(check_new_listings(bot, interval=3600))  # 1 hour
         await bot.start(TOKEN)
 
 

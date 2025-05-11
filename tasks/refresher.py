@@ -25,11 +25,13 @@ async def check_new_listings(bot, interval=3600):  # Check every hour
 
             new_asins = [asin for asin in asin_list if asin not in tracked_asins]
 
+            # Get the corresponding Discord channel
             channel = bot.get_channel(discord_channel_id)
             if channel is None:
                 print(f"⚠️ Channel not found for seller {seller_id}")
                 continue
 
+            # Send new ASIN data
             if new_asins:
                 for asin in new_asins[:2]:
                     add_new_asin(asin, seller_id)
@@ -43,8 +45,9 @@ async def check_new_listings(bot, interval=3600):  # Check every hour
                     except Exception:
                         timestamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
 
+                    # Send information to the channel
                     await channel.send(
-                        f"🆕 **New ASIN Detected!**\n"
+                        f"🆕 **Latest ASIN from `{seller_id}`**\n"
                         f"**ASIN:** `{asin}`\n"
                         f"🔗 {amazon_url}\n"
                         f"🕒 Listed on: `{timestamp}`"
