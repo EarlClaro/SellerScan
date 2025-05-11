@@ -20,9 +20,12 @@ class AdminCommands(commands.Cog):
             return
 
         # Add the new seller to the sellers collection in MongoDB
+        tracked_since = datetime.utcnow()
         sellers_col.insert_one({
             "seller_id": seller_id,
-            "channel_id": channel_id
+            "channel_id": channel_id,
+            "tracked_since": tracked_since,
+            "last_update": tracked_since
         })
 
         await ctx.send(f"✅ Seller ID `{seller_id}` has been added and will be tracked every hour.")
@@ -41,8 +44,13 @@ class AdminCommands(commands.Cog):
         for asin in asin_list:
             add_new_asin(asin, seller_id)
 
-        # Send the 2 latest ASINs
-        for asin in asin_list[:2]:
+        name = seller_data.get("sellerName", "N/A")
+        last_indexed = keepa_minutes_to_utc(seller_data.get("lastListingUpdate", 0)).strftime("%Y-%m-%d %H:%M:%S UTC")
+        tracked_since_str = tracked_since.strftime("%Y-%m-%d %H:%M:%S UTC")
+        last_update_str = tracked_since_str  # Same as tracked_since at this point
+
+        # Send the 3 latest ASINs
+        for asin in asin_list[:3]:
             amazon_url = f"https://www.amazon.com/dp/{asin}"
             try:
                 index = asin_list.index(asin)
@@ -54,9 +62,14 @@ class AdminCommands(commands.Cog):
             await channel.send(
                 f"🆕 **Latest ASIN from `{seller_id}`**\n"
                 f"**ASIN:** `{asin}`\n"
+                f"**Name:** `{name}`\n"
                 f"🔗 {amazon_url}\n"
-                f"🕒 Listed on: `{timestamp}`"
+                f"🕒 Listed on: `{timestamp}`\n"
+                f"📅 Tracked Since: `{tracked_since_str}`\n"
+                f"📦 Last Update: `{last_update_str}`\n"
+                f"📈 Last Indexed by Keepa: `{last_indexed}`"
             )
+
 
     @commands.command(name="cleardb")
     @commands.has_permissions(administrator=True)
