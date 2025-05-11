@@ -18,10 +18,17 @@ async def check_new_listings(bot, interval=3600):  # Check every hour
             if not seller_data or "asinList" not in seller_data or "asinListLastSeen" not in seller_data:
                 continue
 
+            # Extract extra info
+            name = seller_data.get("sellerName", "N/A")
+            last_indexed = keepa_minutes_to_utc(seller_data.get("lastListingUpdate", 0)).strftime("%Y-%m-%d %H:%M:%S UTC")
+            tracked_since = seller.get("tracked_since", datetime.utcnow()).strftime("%Y-%m-%d %H:%M:%S UTC")
+            last_update = seller.get("last_update", datetime.utcnow()).strftime("%Y-%m-%d %H:%M:%S UTC")
+
             # Get the tracked ASINs for the seller
             tracked_asins = get_tracked_asins(seller_id)
             asin_list = seller_data["asinList"]
             asin_last_seen = seller_data["asinListLastSeen"]
+            name = seller_data.get("sellerName", "N/A")
 
             new_asins = [asin for asin in asin_list if asin not in tracked_asins]
 
@@ -33,7 +40,7 @@ async def check_new_listings(bot, interval=3600):  # Check every hour
 
             # Send new ASIN data
             if new_asins:
-                for asin in new_asins[:2]:
+                for asin in new_asins[:3]:
                     add_new_asin(asin, seller_id)
                     amazon_url = f"https://www.amazon.com/dp/{asin}"
 
@@ -41,18 +48,22 @@ async def check_new_listings(bot, interval=3600):  # Check every hour
                     try:
                         index = asin_list.index(asin)
                         keepa_time = asin_last_seen[index]
-                        timestamp = keepa_minutes_to_utc(keepa_time).strftime("%Y-%m-%d %H:%M:%S UTC")
+                        listed_on = keepa_minutes_to_utc(keepa_time).strftime("%Y-%m-%d %H:%M:%S UTC")
                     except Exception:
-                        timestamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+                        listed_on = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
 
-                    # Send information to the channel
+                    # Send info to channel
                     await channel.send(
                         f"🆕 **Latest ASIN from `{seller_id}`**\n"
                         f"**ASIN:** `{asin}`\n"
+                        f"**Name:** `{name}`\n"
                         f"🔗 {amazon_url}\n"
-                        f"🕒 Listed on: `{timestamp}`"
+                        f"🕒 Listed on: `{listed_on}`\n"
+                        f"📅 Tracked Since: `{tracked_since}`\n"
+                        f"📦 Last Update: `{last_update}`\n"
+                        f"📈 Last Indexed by Keepa: `{last_indexed}`"
                     )
             else:
-                await channel.send(f"❌ No new listed products in the past hour for seller `{seller_id}`. No tokens consumed.")
+                await channel.send(f"❌ No new listed products in the past hour for seller `{seller_id}` (`{name}`). 10 tokens consumed.")
 
         await asyncio.sleep(interval)
