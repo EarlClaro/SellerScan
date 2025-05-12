@@ -22,6 +22,9 @@ def create_user(discord_id, username, password, channel_id):
     if users_col.find_one({"username": username}):
         return False  # Username already exists
     
+    if users_col.find_one({"discord_id": str(discord_id)}):
+        return False
+    
     password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
 
     users_col.insert_one({
