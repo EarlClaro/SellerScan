@@ -59,36 +59,41 @@ class UserCommands(commands.Cog):
     async def addseller(self, ctx, seller_id: str):
         channel = ctx.channel
         channel_id = channel.id
+        discord_id = str(ctx.author.id)
 
-        # Check if seller_id is already tracked
-        if sellers_col.find_one({"seller_id": seller_id}):
-            await ctx.send(f"❌ Seller ID `{seller_id}` is already being tracked.")
+        # Get user's session
+        if discord_id not in sessions:
+            await ctx.send("❌ You need to be logged in. Use `!login <username> <password>`.")
             return
 
-        # Add the new seller to the sellers collection in MongoDB
-        sellers_col.insert_one({
-            "seller_id": seller_id,
-            "channel_id": channel_id
-        })
-
-        await ctx.send(f"✅ Seller ID `{seller_id}` has been added and will be tracked every hour.")
-
-        # Fetch seller data from Keepa API
+        # Fetch seller data from Keepa
         seller_data = await fetch_seller_data(seller_id)
-
         if not seller_data or not seller_data.get("asinList"):
             await ctx.send(f"⚠️ Seller `{seller_id}` has no current ASIN listings or data is unavailable.")
             return
 
+        # Save seller in sellers_col (optional: de-dupe by user & seller)
+        sellers_col.update_one(
+            {"seller_id": seller_id, "channel_id": channel_id, "user_id": discord_id},
+            {"$setOnInsert": {
+                "seller_id": seller_id,
+                "channel_id": channel_id,
+                "user_id": discord_id
+            }},
+            upsert=True
+        )
+
         asin_list = seller_data["asinList"]
         asin_last_seen = seller_data.get("asinListLastSeen", [])
+        name = seller_data.get("sellerName", "N/A")
 
-        # Insert all ASINs into the database
+        # Add ASINs for this user
         for asin in asin_list:
-            add_new_asin(asin, seller_id)
+            add_new_asin(asin, seller_id, discord_id)
 
-        # Send the 2 latest ASINs
-        for asin in asin_list[:2]:
+        await ctx.send(f"✅ Seller ID `{seller_id}` has been added and tracked for you.")
+
+        for asin in asin_list[:3]:
             amazon_url = f"https://www.amazon.com/dp/{asin}"
             try:
                 index = asin_list.index(asin)
@@ -98,11 +103,12 @@ class UserCommands(commands.Cog):
                 timestamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
 
             await channel.send(
-                f"🆕 **Latest ASIN from `{seller_id}`**\n"
+                f"🆕 **Latest ASIN from `{seller_id} {name}`**\n"
                 f"**ASIN:** `{asin}`\n"
                 f"🔗 {amazon_url}\n"
-                f"🕒 Listed on: `{timestamp}`"
+                f"🕒 Listed on: `{timestamp}`\n"
             )
+
 
     @commands.command(name="logout")
     async def logout(self, ctx):

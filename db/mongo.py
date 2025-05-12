@@ -11,6 +11,9 @@ db = client["sellerscan"]
 users_col = db["users"]
 asins_col = db["asins"]
 sellers_col = db["sellers"]
+
+sellers_col.create_index([("seller_id", 1), ("user_id", 1)], unique=True)
+
 # ------------------------------
 # User-related operations with password hashing
 # ------------------------------
@@ -48,13 +51,13 @@ def update_keepa_api_key(discord_id, keepa_api_key):
 # ASIN tracking (unchanged)
 # ------------------------------
 
-def get_tracked_asins(seller_id):
-    return set(doc["asin"] for doc in asins_col.find({"seller_id": seller_id}))
+def get_tracked_asins(seller_id, user_id):
+    return set(doc["asin"] for doc in asins_col.find({"seller_id": seller_id, "user_id": user_id}))
 
-def add_new_asin(asin, seller_id):
+def add_new_asin(asin, seller_id, user_id):
     asins_col.update_one(
-        {"asin": asin, "seller_id": seller_id},
-        {"$setOnInsert": {"asin": asin, "seller_id": seller_id}},
+        {"asin": asin, "seller_id": seller_id, "user_id": user_id},
+        {"$setOnInsert": {"asin": asin, "seller_id": seller_id, "user_id": user_id}},
         upsert=True
     )
 
