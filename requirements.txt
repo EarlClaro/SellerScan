@@ -1,4 +1,7 @@
 discord.py
-pymongo
 python-dotenv
+pymongo
 aiohttp
+bcrypt
+
+
