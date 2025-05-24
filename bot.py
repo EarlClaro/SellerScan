@@ -4,10 +4,13 @@ from dotenv import load_dotenv
 import os
 import asyncio
 from tasks.refresher import check_new_listings
+from keep_alive import keep_alive
 
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
-
+if not TOKEN:
+    raise ValueError("Discord token not found in environment variables.")
+    
 intents = discord.Intents.default()
 intents.message_content = True  # Make sure this is enabled
 intents.dm_messages = True
@@ -33,4 +36,5 @@ async def main():
 
 
 if __name__ == "__main__":
+    keep_alive()
     asyncio.run(main())

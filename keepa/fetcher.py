@@ -4,11 +4,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 KEEPA_API_KEY = os.getenv("KEEPA_API_KEY")
-DOMAIN_ID = 1  # Amazon.com domain
 
-async def fetch_seller_data(seller_id):
-    # Fetch seller data from Keepa API
-    url = f"https://api.keepa.com/seller?key={KEEPA_API_KEY}&domain={DOMAIN_ID}&seller={seller_id}&storefront=1"
+async def fetch_seller_data(seller_id, domain_id=1):
+    # Fetch seller data from Keepa API using the specified domain_id
+    url = f"https://api.keepa.com/seller?key={KEEPA_API_KEY}&domain={domain_id}&seller={seller_id}&storefront=1"
     async with aiohttp.ClientSession() as session:
         async with session.get(url) as resp:
             data = await resp.json()
@@ -17,12 +16,11 @@ async def fetch_seller_data(seller_id):
                 return None
             return data["sellers"].get(seller_id)
 
-async def fetch_asin_details(asin):
-    # Fetch ASIN details from Keepa API
-    url = f"https://api.keepa.com/product?key={KEEPA_API_KEY}&domain={DOMAIN_ID}&asin={asin}&history=0"
+async def get_token_status():
+    url = f"https://api.keepa.com/token?key={KEEPA_API_KEY}"
     async with aiohttp.ClientSession() as session:
         async with session.get(url) as resp:
             data = await resp.json()
-            if "products" not in data or not data["products"]:
-                return None
-            return data["products"][0]
+            if "tokensLeft" in data and "refillIn" in data:
+                return data
+            return None
