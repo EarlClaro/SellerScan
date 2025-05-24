@@ -97,7 +97,7 @@ class UserCommands(commands.Cog):
         channel_id = channel.id
         discord_id = str(ctx.author.id)
 
-        await ctx.send(f"🔍 Fetching seller `{seller_id}` data...")
+        await ctx.send(f"🔍 Fetching seller `{seller_id}` data... Please wait and don't input another command until this is done.")
 
         if discord_id not in sessions:
             await ctx.send("❌ You need to be logged in. Use `!login <username> <password>`.")
@@ -153,7 +153,7 @@ class UserCommands(commands.Cog):
                 timestamp = datetime.utcnow().replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo("Asia/Manila")).strftime("%Y-%m-%d %I:%M:%S %p PHT")
 
             message_lines.append(
-                f"🆕 **ASIN `{asin}` from `{seller_id} {name}`**\n"
+                f"🆕 **ASIN `{asin}` from `{name}, {seller_id}`**\n"
                 f"🔗 {amazon_url}\n"
                 f"🕒 Listed on: `{timestamp}`\n"
             )
@@ -193,6 +193,27 @@ class UserCommands(commands.Cog):
             await ctx.send(f"🔑 **Keepa API Token Status:**\n🔹 Tokens left: `{tokens}`\n🔄 Refill in: `{refill_in} minutes`")
         else:
             await ctx.send("⚠️ Failed to retrieve token info. Please check your Keepa API key.")
+        
+    @commands.command(name="mysellers")
+    async def mysellers(self, ctx):
+        discord_id = str(ctx.author.id)
+    
+        if discord_id not in sessions:
+            await ctx.send("❌ You need to be logged in to view your tracked sellers.")
+            return
+    
+        user_sellers = list(sellers_col.find({"user_id": discord_id}))
+    
+        if not user_sellers:
+            await ctx.send("📭 You are not tracking any sellers yet. Use `!adduserseller <seller_id>` to start.")
+            return
+    
+        message_lines = ["📋 **Your Tracked Sellers:**"]
+        for seller in user_sellers:
+            seller_id = seller["seller_id"]
+            message_lines.append(f"🔹 `{seller_id}`")
+    
+        await ctx.send("\n".join(message_lines))
         
 async def setup(bot):
     await bot.add_cog(UserCommands(bot))
