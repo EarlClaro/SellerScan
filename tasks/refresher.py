@@ -5,24 +5,65 @@ from db.mongo import get_tracked_asins, add_new_asin, sellers_col, users_col
 from utils.time import keepa_minutes_to_utc
 from zoneinfo import ZoneInfo
 
-# Domain map for generating correct Amazon links
 DOMAIN_MAP = {
     1: "com", 2: "co.uk", 3: "de", 4: "fr", 5: "co.jp",
     6: "ca", 8: "it", 9: "es", 10: "in", 11: "com.mx"
 }
 
-# Helper function to throttle and safely send messages
-async def safe_send(channel, content):
-    try:
-        await asyncio.sleep(1.5)  # Basic throttling between sends
-        await channel.send(content)
-    except Exception as e:
-        print(f"[SEND ERROR] Failed to send message: {e}")
+# Per-channel message queues
+message_queues = {}
+queue_locks = {}
+
+# Maximum messages per channel per interval (Discord limit)
+MAX_MESSAGES_PER_INTERVAL = 5
+INTERVAL_SECONDS = 5
+
+async def send_message_worker(channel):
+    """Worker task to send messages from a channel's queue respecting rate limits."""
+    queue = message_queues[channel.id]
+    lock = queue_locks[channel.id]
+
+    while True:
+        # Send up to MAX_MESSAGES_PER_INTERVAL messages, then wait INTERVAL_SECONDS
+        messages_to_send = []
+        async with lock:
+            for _ in range(min(MAX_MESSAGES_PER_INTERVAL, queue.qsize())):
+                try:
+                    msg = queue.get_nowait()
+                    messages_to_send.append(msg)
+                except asyncio.QueueEmpty:
+                    break
+
+        for content in messages_to_send:
+            try:
+                await channel.send(content)
+            except Exception as e:
+                print(f"[SEND ERROR] Failed to send message to {channel.id}: {e}")
+
+        if messages_to_send:
+            # Wait to respect rate limit
+            await asyncio.sleep(INTERVAL_SECONDS)
+        else:
+            # No messages - wait a short moment before checking again
+            await asyncio.sleep(1)
+
+async def enqueue_message(channel, content):
+    """Add a message to the channel's queue and start worker if not running."""
+    if channel.id not in message_queues:
+        message_queues[channel.id] = asyncio.Queue()
+        queue_locks[channel.id] = asyncio.Lock()
+        # Start the worker task for this channel
+        asyncio.create_task(send_message_worker(channel))
+
+    await message_queues[channel.id].put(content)
 
 async def check_new_listings(bot, interval=3600):
     await bot.wait_until_ready()
 
     while not bot.is_closed():
+        # Prepare a dict to batch messages per channel
+        messages_per_channel = {}
+
         for seller in sellers_col.find():
             seller_id = seller["seller_id"]
             discord_channel_id = seller["channel_id"]
@@ -45,7 +86,7 @@ async def check_new_listings(bot, interval=3600):
                 seller_data = await fetch_seller_data(
                     seller_id,
                     domain_id=domain_id,
-                    keepa_api_key=keepa_api_key  # 🟢 USER-SPECIFIC API KEY
+                    keepa_api_key=keepa_api_key
                 )
             except Exception as e:
                 print(f"❌ Error fetching data for seller {seller_id}: {str(e)}")
@@ -67,7 +108,9 @@ async def check_new_listings(bot, interval=3600):
             new_asins = [asin for asin in asin_list if asin not in tracked_asins]
 
             if new_asins:
-                for asin in new_asins[:3]:  # Limit to top 3 new ASINs
+                # Compose a batch message with all new ASINs for this seller
+                lines = [f"🆕 **New ASIN(s) from `{seller_id} {name}`:**"]
+                for asin in new_asins[:3]:  # Limit to 3 per seller
                     add_new_asin(asin, seller_id, user_id)
                     amazon_url = f"https://www.amazon.{domain_suffix}/dp/{asin}"
 
@@ -81,20 +124,26 @@ async def check_new_listings(bot, interval=3600):
                             tzinfo=ZoneInfo("UTC")).astimezone(
                             ZoneInfo("Asia/Manila")).strftime("%Y-%m-%d %I:%M:%S %p PHT")
 
-                    message = (
-                        f"🆕 **New ASIN from `{seller_id} {name}`**\n"
+                    lines.append(
                         f"**ASIN:** `{asin}`\n"
                         f"🔗 {amazon_url}\n"
                         f"🕒 Listed on: `{listed_on}`\n"
-                        f"👤 Tracked by: <@{user_id}>"
                     )
-                    await safe_send(channel, message)
+                lines.append(f"👤 Tracked by: <@{user_id}>")
+
+                # Append this message to the channel batch
+                messages_per_channel.setdefault(discord_channel_id, []).append("\n".join(lines))
             else:
-                message = (
-                    f"ℹ️ No new ASINs for seller `{seller_id} {name}`. 10 tokens used\n"
-                    f"👤 Tracked by: <@{user_id}>"
-                )
-                await safe_send(channel, message)
-                print(f"[INFO] No new ASINs for seller {seller_id} ({name}) — message sent.")
+                # Optional: you can choose whether to send "no new ASIN" messages or not.
+                # Here we skip to reduce message spam.
+                pass
+
+        # Enqueue the batched messages per channel for sending
+        for channel_id, msgs in messages_per_channel.items():
+            channel = bot.get_channel(channel_id)
+            if not channel:
+                continue
+            for msg in msgs:
+                await enqueue_message(channel, msg)
 
         await asyncio.sleep(interval)
