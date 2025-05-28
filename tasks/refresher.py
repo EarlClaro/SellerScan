@@ -33,11 +33,20 @@ async def check_new_listings(bot, interval=3600):
                 print(f"⚠️ User not found for seller {seller_id}")
                 continue
 
+            keepa_api_key = user.get("keepa_api_key")
+            if not keepa_api_key:
+                print(f"⚠️ No Keepa API key found for user {user_id}")
+                continue
+
             domain_id = user.get("domain_id", 1)
             domain_suffix = DOMAIN_MAP.get(domain_id, "com")
 
             try:
-                seller_data = await fetch_seller_data(seller_id, domain_id=domain_id)
+                seller_data = await fetch_seller_data(
+                    seller_id,
+                    domain_id=domain_id,
+                    keepa_api_key=keepa_api_key  # 🟢 USER-SPECIFIC API KEY
+                )
             except Exception as e:
                 print(f"❌ Error fetching data for seller {seller_id}: {str(e)}")
                 continue
