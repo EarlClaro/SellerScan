@@ -186,7 +186,7 @@ class UserCommands(commands.Cog):
         from keepa import fetcher
         fetcher.KEEPA_API_KEY = user["keepa_api_key"]
     
-        token_data = await get_token_status()
+        token_data = await get_token_status(user["keepa_api_key"])
         if token_data:
             tokens = token_data["tokensLeft"]
             refill_in = round(token_data["refillIn"] / 60, 2)
