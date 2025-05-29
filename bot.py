@@ -25,7 +25,7 @@ async def on_ready():
 
 async def load_extensions():
     # Correctly await the loading of the cogs
-    await bot.load_extension("cogs.admin")
+    # await bot.load_extension("cogs.admin")
     await bot.load_extension("cogs.user")  # Add the user cog
 
 async def main():
