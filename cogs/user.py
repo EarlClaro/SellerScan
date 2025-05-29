@@ -132,7 +132,8 @@ class UserCommands(commands.Cog):
             return
 
         try:
-            seller_data = await fetch_seller_data(seller_id, domain_id=domain_id)
+            seller_data = await fetch_seller_data(seller_id, domain_id=domain_id, keepa_api_key=user.get("keepa_api_key"))
+
         except Exception as e:
             await ctx.send(f"❌ Error fetching data from Keepa: {str(e)}")
             return
