@@ -232,26 +232,24 @@ class UserCommands(commands.Cog):
 
     @commands.command(name="removeseller")
     async def removeseller(self, ctx, seller_id: str):
-            discord_id = str(ctx.author.id)
+        discord_id = str(ctx.author.id)
 
-            user = users_col.find_one({'discord_id': discord_id})
-            if not user:
-                await ctx.send("❌ User not found. Please register first.")
-                return
+        user = users_col.find_one({'discord_id': discord_id})
+        if not user:
+            await ctx.send("❌ User not found. Please register first.")
+            return
 
-            if seller_id not in user.get("seller_ids", []):
-                await ctx.send(f"⚠️ Seller ID `{seller_id}` is not in your tracked list.")
-                return
+        # Check in sellers_col directly instead of user['seller_ids']
+        seller_entry = sellers_col.find_one({'user_id': discord_id, 'seller_id': seller_id})
+        if not seller_entry:
+            await ctx.send(f"⚠️ Seller ID `{seller_id}` is not in your tracked list.")
+            return
 
-            sellers_col.delete_many({'user_id': discord_id, 'seller_id': seller_id})
-            asins_col.delete_many({'user_id': discord_id, 'seller_id': seller_id})
+        sellers_col.delete_many({'user_id': discord_id, 'seller_id': seller_id})
+        asins_col.delete_many({'user_id': discord_id, 'seller_id': seller_id})
 
-            users_col.update_one(
-                {'discord_id': discord_id},
-                {'$pull': {'seller_ids': seller_id}}
-            )
+        await ctx.send(f"✅ Seller `{seller_id}` and all related ASINs have been removed.")
 
-            await ctx.send(f"✅ Seller `{seller_id}` and all related ASINs have been removed.")
 
 async def setup(bot):
     await bot.add_cog(UserCommands(bot))
