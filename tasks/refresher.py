@@ -134,8 +134,7 @@ async def check_new_listings(bot, interval=3600):
                 # Append this message to the channel batch
                 messages_per_channel.setdefault(discord_channel_id, []).append("\n".join(lines))
             else:
-                # Here we skip to reduce message spam.
-                pass
+                print(f"ℹ️ No new ASINs found for seller {seller_id} in the past hour.")
 
         # Enqueue the batched messages per channel for sending
         for channel_id, msgs in messages_per_channel.items():
