@@ -1,6 +1,6 @@
 from discord.ext import commands
 from db.mongo import create_user, verify_user, update_keepa_api_key
-from db.mongo import sellers_col, add_new_asin, users_col
+from db.mongo import sellers_col, add_new_asin, users_col, asins_col
 from keepa.fetcher import fetch_seller_data
 from utils.time import keepa_minutes_to_utc
 from datetime import datetime
@@ -30,7 +30,21 @@ class UserCommands(commands.Cog):
 
     @commands.command(name="helpme")
     async def help_command(self, ctx):
-        await ctx.send("👋 This bot helps you track new listings from Amazon sellers. Contact an admin to subscribe.")
+        help_text = (
+            "**🛠️ SellerScan Bot Commands:**\n"
+            "\n"
+            "`!register <username> <password> <repeat_password>` - Register a new user.\n"
+            "`!login <username> <password>` - Log in to your account.\n"
+            "`!logout` - Log out from the bot.\n"
+            "`!setkeepaapi <api_key>` - Set or update your Keepa API key.\n"
+            "`!setdomain <id>` - Set your Amazon domain (e.g., 1 for .com, 3 for .de).\n"
+            "`!adduserseller <seller_id>` - Add a seller to your tracking list.\n"
+            "`!removeseller <seller_id>` - Remove a seller and its related ASINs.\n"
+            "`!mysellers` - List all seller IDs you're tracking.\n"
+            "`!mytokens` - View your Keepa token status.\n"
+            "`!helpme` - Display this help message."
+        )
+        await ctx.send(help_text)
 
     @commands.command(name="register")
     async def register(self, ctx, username: str, password: str, repeat_password: str):
@@ -214,6 +228,30 @@ class UserCommands(commands.Cog):
             message_lines.append(f"🔹 `{seller_id}`")
     
         await ctx.send("\n".join(message_lines))
-        
+
+
+    @commands.command(name="removeseller")
+    async def removeseller(self, ctx, seller_id: str):
+            discord_id = str(ctx.author.id)
+
+            user = users_col.find_one({'discord_id': discord_id})
+            if not user:
+                await ctx.send("❌ User not found. Please register first.")
+                return
+
+            if seller_id not in user.get("seller_ids", []):
+                await ctx.send(f"⚠️ Seller ID `{seller_id}` is not in your tracked list.")
+                return
+
+            sellers_col.delete_many({'user_id': discord_id, 'seller_id': seller_id})
+            asins_col.delete_many({'user_id': discord_id, 'seller_id': seller_id})
+
+            users_col.update_one(
+                {'discord_id': discord_id},
+                {'$pull': {'seller_ids': seller_id}}
+            )
+
+            await ctx.send(f"✅ Seller `{seller_id}` and all related ASINs have been removed.")
+
 async def setup(bot):
     await bot.add_cog(UserCommands(bot))
