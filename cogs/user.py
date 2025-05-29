@@ -140,7 +140,8 @@ class UserCommands(commands.Cog):
             {"$setOnInsert": {
                 "seller_id": seller_id,
                 "channel_id": channel_id,
-                "user_id": discord_id
+                "user_id": discord_id,
+                "seller_name": name
             }},
             upsert=True
         )
@@ -225,7 +226,9 @@ class UserCommands(commands.Cog):
         message_lines = ["📋 **Your Tracked Sellers:**"]
         for seller in user_sellers:
             seller_id = seller["seller_id"]
-            message_lines.append(f"🔹 `{seller_id}`")
+            seller_name = seller.get("seller_name", "N/A")
+            message_lines.append(f"🔹 `{seller_id}` — **{seller_name}**")
+
     
         await ctx.send("\n".join(message_lines))
 
