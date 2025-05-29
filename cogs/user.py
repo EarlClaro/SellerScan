@@ -6,6 +6,7 @@ from utils.time import keepa_minutes_to_utc
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from keepa.fetcher import get_token_status
+from keepa import fetcher 
 
 # In-memory session storage
 sessions = {}
@@ -104,7 +105,7 @@ class UserCommands(commands.Cog):
             {"$set": {"domain_id": domain_id}}
         )
         await ctx.send(f"✅ Domain set to `{valid_domains[domain_id]}` (ID: {domain_id}).")
-
+    
     @commands.command(name="adduserseller")
     async def addseller(self, ctx, seller_id: str):
         channel = ctx.channel
@@ -124,6 +125,12 @@ class UserCommands(commands.Cog):
 
         domain_id = user.get("domain_id", 1)
 
+        # Set the Keepa API key globally for the fetcher
+        fetcher.KEEPA_API_KEY = user.get("keepa_api_key")
+        if not fetcher.KEEPA_API_KEY:
+            await ctx.send("❌ You must set your Keepa API key first using !setkeepaapi <your_api_key>.")
+            return
+
         try:
             seller_data = await fetch_seller_data(seller_id, domain_id=domain_id)
         except Exception as e:
@@ -133,6 +140,8 @@ class UserCommands(commands.Cog):
         if not seller_data or not seller_data.get("asinList"):
             await ctx.send(f"⚠️ Seller `{seller_id}` has no current ASIN listings or data is unavailable.")
             return
+
+        name = seller_data.get("sellerName", "N/A")
 
         # Save seller to DB
         sellers_col.update_one(
@@ -148,7 +157,6 @@ class UserCommands(commands.Cog):
 
         asin_list = seller_data["asinList"]
         asin_last_seen = seller_data.get("asinListLastSeen", [])
-        name = seller_data.get("sellerName", "N/A")
 
         for asin in asin_list:
             add_new_asin(asin, seller_id, discord_id)
